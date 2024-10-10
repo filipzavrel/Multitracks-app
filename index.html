@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Výběr a úprava písní</title>
     <link rel="stylesheet" href="style.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.7.1/jszip.min.js"></script>
     <style>
         body {
             font-family: Arial, sans-serif;
@@ -15,12 +16,6 @@
         h1 {
             text-align: center;
             color: #333;
-        }
-        #songInput {
-            display: block;
-            margin: 20px auto;
-            padding: 10px;
-            font-size: 16px;
         }
         #songList {
             display: flex;
@@ -104,134 +99,130 @@
 </head>
 <body>
     <h1>Výběr písně a úprava stop</h1>
-    <label for="songInput">Nahrajte složku s písněmi:</label>
-    <input type="file" id="songInput" webkitdirectory multiple>
     <div id="songList"></div>
     <div id="trackControls"></div>
     <script>
         document.addEventListener("DOMContentLoaded", () => {
-            const songInput = document.getElementById('songInput');
             const songList = document.getElementById('songList');
             const trackControls = document.getElementById('trackControls');
             const playSelectedButton = document.createElement('button');
             const stopSelectedButton = document.createElement('button');
             let audioElements = [];
+            const zipURL = 'https://drive.google.com/uc?export=download&id=1Iwc-AkxkfkcCHj0EvTYXqPVjVTEe59TW'; // Odkaz na ZIP soubor 
 
             playSelectedButton.textContent = 'Přehrát vybrané';
             playSelectedButton.className = 'play-selected-button';
             stopSelectedButton.textContent = 'Zastavit vybrané';
             stopSelectedButton.className = 'stop-selected-button';
 
-            songInput.addEventListener('change', (event) => {
-                const files = Array.from(event.target.files);
-                const songFolders = {};
-
-                // Roztřídit soubory podle složek (písní)
-                files.forEach(file => {
-                    const folderName = file.webkitRelativePath.split('/')[1];
-                    if (!songFolders[folderName]) {
-                        songFolders[folderName] = [];
-                    }
-                    songFolders[folderName].push(file);
-                });
-
-                displaySongList(songFolders);
+            // Přidání tlačítka pro stažení a rozbalení ZIP souboru
+            const songButton = document.createElement('button');
+            songButton.textContent = 'Aronské požehnání edit';
+            songButton.className = 'song-button';
+            songButton.addEventListener('click', () => {
+                loadZipTracks(zipURL);
             });
+            songList.appendChild(songButton);
 
-            function displaySongList(songFolders) {
-                songList.innerHTML = ''; // Vymazání předchozího seznamu písní
-                trackControls.innerHTML = ''; // Vymazání předchozích ovládacích prvků
-                audioElements = []; // Vymazání předchozích zvukových prvků
-
-                Object.keys(songFolders).forEach(folderName => {
-                    const songButton = document.createElement('button');
-                    songButton.textContent = folderName;
-                    songButton.className = 'song-button';
-                    songButton.addEventListener('click', () => {
-                        loadTracks(songFolders[folderName]);
-                    });
-                    songList.appendChild(songButton);
-                });
-            }
-
-            function loadTracks(tracks) {
+            function loadZipTracks(url) {
                 trackControls.innerHTML = ''; // Vymazání předchozích ovládacích prvků
                 audioElements = []; // Vymazání předchozích zvukových prvků
 
                 trackControls.appendChild(playSelectedButton);
                 trackControls.appendChild(stopSelectedButton);
 
-                tracks.forEach((trackFile, index) => {
-                    const audioElement = new Audio(URL.createObjectURL(trackFile));
-                    const volumeControl = document.createElement('input');
-                    const checkbox = document.createElement('input');
-                    const playButton = document.createElement('button');
-                    const stopButton = document.createElement('button');
-                    const trackContainer = document.createElement('div');
-                    const trackLabel = document.createElement('span');
-                    const progressBar = document.createElement('input');
+                fetch(url)
+                    .then(response => response.arrayBuffer())
+                    .then(data => JSZip.loadAsync(data))
+                    .then(zip => {
+                        const trackPromises = [];
+                        zip.forEach((relativePath, zipEntry) => {
+                            if (zipEntry.name.endsWith('.mp3')) {
+                                trackPromises.push(
+                                    zipEntry.async('blob').then(blob => {
+                                        return { name: zipEntry.name, url: URL.createObjectURL(blob) };
+                                    })
+                                );
+                            }
+                        });
+                        return Promise.all(trackPromises);
+                    })
+                    .then(tracks => {
+                        tracks.forEach((track, index) => {
+                            const audioElement = new Audio(track.url);
+                            const volumeControl = document.createElement('input');
+                            const checkbox = document.createElement('input');
+                            const playButton = document.createElement('button');
+                            const stopButton = document.createElement('button');
+                            const trackContainer = document.createElement('div');
+                            const trackLabel = document.createElement('span');
+                            const progressBar = document.createElement('input');
 
-                    trackContainer.className = 'track-container';
-                    trackLabel.className = 'track-label';
-                    trackLabel.textContent = trackFile.name;
+                            trackContainer.className = 'track-container';
+                            trackLabel.className = 'track-label';
+                            trackLabel.textContent = track.name;
 
-                    volumeControl.type = 'range';
-                    volumeControl.min = 0;
-                    volumeControl.max = 1;
-                    volumeControl.step = 0.01;
-                    volumeControl.value = 1;
-                    volumeControl.className = 'volume-control';
+                            volumeControl.type = 'range';
+                            volumeControl.min = 0;
+                            volumeControl.max = 1;
+                            volumeControl.step = 0.01;
+                            volumeControl.value = 1;
+                            volumeControl.className = 'volume-control';
 
-                    volumeControl.addEventListener('input', () => {
-                        audioElement.volume = volumeControl.value;
-                    });
+                            volumeControl.addEventListener('input', () => {
+                                audioElement.volume = volumeControl.value;
+                            });
 
-                    playButton.textContent = 'Přehrát';
-                    playButton.className = 'play-button';
-                    playButton.addEventListener('click', () => {
-                        if (audioElement.paused) {
-                            audioElement.play();
-                            playButton.textContent = 'Pauza';
-                        } else {
-                            audioElement.pause();
                             playButton.textContent = 'Přehrát';
-                        }
+                            playButton.className = 'play-button';
+                            playButton.addEventListener('click', () => {
+                                if (audioElement.paused) {
+                                    audioElement.play();
+                                    playButton.textContent = 'Pauza';
+                                } else {
+                                    audioElement.pause();
+                                    playButton.textContent = 'Přehrát';
+                                }
+                            });
+
+                            stopButton.textContent = 'Zastavit';
+                            stopButton.className = 'stop-button';
+                            stopButton.addEventListener('click', () => {
+                                audioElement.pause();
+                                audioElement.currentTime = 0;
+                                playButton.textContent = 'Přehrát';
+                            });
+
+                            checkbox.type = 'checkbox';
+                            checkbox.className = 'track-checkbox';
+
+                            progressBar.type = 'range';
+                            progressBar.min = 0;
+                            progressBar.max = 100;
+                            progressBar.value = 0;
+                            progressBar.className = 'progress-bar';
+                            progressBar.disabled = true;
+
+                            audioElement.addEventListener('timeupdate', () => {
+                                progressBar.value = (audioElement.currentTime / audioElement.duration) * 100;
+                            });
+
+                            trackContainer.appendChild(checkbox);
+                            trackContainer.appendChild(trackLabel);
+                            trackContainer.appendChild(playButton);
+                            trackContainer.appendChild(stopButton);
+                            trackContainer.appendChild(document.createTextNode(' Progress: '));
+                            trackContainer.appendChild(progressBar);
+                            trackContainer.appendChild(document.createTextNode(' Hlasitost: '));
+                            trackContainer.appendChild(volumeControl);
+                            trackControls.appendChild(trackContainer);
+
+                            audioElements.push({ audio: audioElement, checkbox: checkbox, volumeControl: volumeControl });
+                        });
+                    })
+                    .catch(error => {
+                        console.error('Chyba při načítání ZIP souboru:', error);
                     });
-
-                    stopButton.textContent = 'Zastavit';
-                    stopButton.className = 'stop-button';
-                    stopButton.addEventListener('click', () => {
-                        audioElement.pause();
-                        audioElement.currentTime = 0;
-                        playButton.textContent = 'Přehrát';
-                    });
-
-                    checkbox.type = 'checkbox';
-                    checkbox.className = 'track-checkbox';
-
-                    progressBar.type = 'range';
-                    progressBar.min = 0;
-                    progressBar.max = 100;
-                    progressBar.value = 0;
-                    progressBar.className = 'progress-bar';
-                    progressBar.disabled = true;
-
-                    audioElement.addEventListener('timeupdate', () => {
-                        progressBar.value = (audioElement.currentTime / audioElement.duration) * 100;
-                    });
-
-                    trackContainer.appendChild(checkbox);
-                    trackContainer.appendChild(trackLabel);
-                    trackContainer.appendChild(playButton);
-                    trackContainer.appendChild(stopButton);
-                    trackContainer.appendChild(document.createTextNode(' Progress: '));
-                    trackContainer.appendChild(progressBar);
-                    trackContainer.appendChild(document.createTextNode(' Hlasitost: '));
-                    trackContainer.appendChild(volumeControl);
-                    trackControls.appendChild(trackContainer);
-
-                    audioElements.push({ audio: audioElement, checkbox: checkbox, volumeControl: volumeControl });
-                });
             }
 
             playSelectedButton.addEventListener('click', () => {
