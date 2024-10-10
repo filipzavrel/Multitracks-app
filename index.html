@@ -108,7 +108,8 @@
             const playSelectedButton = document.createElement('button');
             const stopSelectedButton = document.createElement('button');
             let audioElements = [];
-            const zipURL = 'https://drive.google.com/uc?export=download&id=1Iwc-AkxkfkcCHj0EvTYXqPVjVTEe59TW'; // Odkaz na ZIP soubor 
+            const corsProxy = 'https://cors-anywhere.herokuapp.com/';
+            const zipURL = `${corsProxy}https://drive.google.com/uc?export=download&id=YOUR_FILE_ID`; // Odkaz na ZIP soubor
 
             playSelectedButton.textContent = 'Přehrát vybrané';
             playSelectedButton.className = 'play-selected-button';
